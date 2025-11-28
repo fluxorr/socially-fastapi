@@ -36,7 +36,7 @@ async def upload_file(
             delete=False, suffix=os.path.splitext(file.filename)[1]
         ) as temp_file:
             temp_file_path = temp_file.name
-            shutil.copyfileobj(file.file, temp_file)
+            shutil.copyfileobj(file.file, temp_file) # The uploaded file gets copied into the temporary file on disk.
         upload_result = imagekit.upload_file(
             file=open(temp_file_path, "rb"),
             file_name=file.filename,
@@ -94,3 +94,24 @@ async def get_feed(session: AsyncSession = Depends(get_async_session)):
         )
 
     return {"posts": posts_data}
+
+
+
+@app.delete("/posts/{posts_id}")
+async def delete_post(post_id: str, session: AsyncSession = Depends(get_async_session)):
+    try:
+        post_uuid = uuid.UUID(post_id)
+
+        result = await session.execute(select(Post).where(Post.id == post_uuid))
+        post = result.scalars().first() # scalars return the exact result rahter than an object we need to loop thru
+
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        await session.delete(post)
+        await session.commit()
+
+        return {"success": True , "message": f"Post {post.caption} deleted succesfully "}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
